@@ -17,14 +17,14 @@ with open(path.join(here, 'README.md'), encoding='utf-8') as f:
     long_description = f.read()
 
 setup(
-    name='ffdb',
+    name='seqrenamer',
 
     # Versions should comply with PEP440.  For a discussion on single-sourcing
     # the version across setup.py and the project code, see
     # https://packaging.python.org/en/latest/single_source_version.html
     version='0.0.0',
 
-    description='Utility scripts to work with ffindex databases files.',
+    description='.',
     long_description=long_description,
 
     # The project's main homepage.
@@ -69,7 +69,7 @@ setup(
     # requirements files see:
     # https://packaging.python.org/en/latest/requirements.html
 
-    install_requires=[],
+    install_requires=["python-baseconv"],
 
     # List additional groups of dependencies here (e.g. development
     # dependencies). You can install these using the following syntax,
@@ -93,7 +93,7 @@ setup(
     # pip to create the appropriate form of executable for the target platform.
     entry_points={
         'console_scripts': [
-            'ffdb=ffdb.main:main',
+            'sr=seqrenamer.scripts:main',
         ],
     },
 )

@@ -1,9 +1,13 @@
 import sys
 import argparse
 
+import csv
+
 from seqrenamer.exceptions import MapFileParseError
 from seqrenamer.exceptions import MapFileKeyError
+from seqrenamer.exceptions import XsvColumnNumberError
 from seqrenamer.seq import Seq, Seqs
+from seqrenamer.xsv import Xsv
 from seqrenamer.scripts.encode import check_format, check_column
 from seqrenamer.scripts.encode import FORMATS
 
@@ -110,11 +114,13 @@ def decode_seqs(infiles, outfile, map_, column):
     chunk = list()
     for i, seq in enumerate(seqs, 1):
         if column == "description":
-            old_desc = get_from_map(map_, seq.desc)
-            chunk.append(str(Seq(seq.id, old_desc, seq.seq)))
+            old_descs = get_from_map(map_, seq.desc)
+            for old_desc in old_descs:
+                chunk.append(str(Seq(seq.id, old_desc, seq.seq)))
         else:
-            old_id = get_from_map(map_, seq.id)
-            chunk.append(str(Seq(old_id, seq.desc, seq.seq)))
+            old_ids = get_from_map(map_, seq.id)
+            for old_id in old_ids:
+                chunk.append(str(Seq(old_id, seq.desc, seq.seq)))
 
         if i % 10000:
             outfile.write(''.join(chunk))
@@ -124,13 +130,73 @@ def decode_seqs(infiles, outfile, map_, column):
     return
 
 
+def join_files(infiles, header=False):
+    first = True
+
+    for f in infiles:
+        if header and not first:
+            # Drop the first line
+            _ = next(f)
+
+        first = False
+        for line in f:
+            yield line.rstrip("\r\n")
+    return
+
+
+def decode_xsv(
+    infiles,
+    outfile,
+    map_,
+    column,
+    comment,
+    header,
+    sep,
+):
+    xsv_writer = csv.writer(outfile, delimiter=sep, dialect='excel')
+
+    inhandles = join_files(infiles, header)
+    xsv_reader = Xsv(inhandles, comment, sep)
+
+    first = True
+    for row in xsv_reader:
+        if header and first:
+            xsv_writer.writerow(row)
+            first = False
+            continue
+
+        try:
+            old_val = get_from_map(map_, row[column])
+            row[column] = old_val
+        except IndexError:
+            joined_line = sep.join(map(str, row))
+            raise XsvColumnNumberError(
+                f"Could not access column '{column}' in a line. "
+                f"The offending line was: {joined_line}."
+            )
+
+        xsv_writer.writerow(row)
+    return
+
+
 def decode(args):
-    format = check_format(args)
-    column = check_column(args, format)
+    format = check_format(args.format, args.infiles)
+    column = check_column(args.column, format)
+
     map_ = parse_map_file(args.map)
 
     if format == "fasta":
         decode_seqs(args.infiles, args.outfile, map_, column)
+    if format in ("csv", "tsv"):
+        decode_xsv(
+            args.infiles,
+            args.outfile,
+            map_,
+            column,
+            args.comment,
+            args.header,
+            ',' if format == "csv" else '\t',
+        )
     else:
         raise ValueError("This shouldn't ever happen")
     return

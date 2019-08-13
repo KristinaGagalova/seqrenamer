@@ -10,7 +10,7 @@ class SRException(Exception):
         self.msg = msg
 
 
-class InvalidArgumentException(SRException):
+class InvalidArgumentError(SRException):
     ecode = 1
 
 
@@ -20,3 +20,7 @@ class MapFileParseError(SRException):
 
 class MapFileKeyError(SRException):
     ecode = 3
+
+
+class XsvColumnNumberError(SRException):
+    ecode = 4
