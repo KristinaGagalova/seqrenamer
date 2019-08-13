@@ -1,0 +1,2 @@
+# seqrenamer
+Script for ids.
