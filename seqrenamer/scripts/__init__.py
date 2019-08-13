@@ -46,6 +46,9 @@ def main():
     except SRException as e:
         print(f"Error: {e.msg}")
         sys.exit(e.ecode)
+    except BrokenPipeError:
+        # Pipes get closed and that's normal
+        sys.exit(0)
     except EnvironmentError as e:
         print((
             "Encountered a system error.\n"
@@ -56,9 +59,6 @@ def main():
     except KeyboardInterrupt:
         print("Received keyboard interrupt. Exiting.", file=sys.stderr)
         sys.exit(1)
-    except BrokenPipeError:
-        # Pipes get closed and that's normal
-        sys.exit(0)
     except Exception as e:
         print((
             "I'm so sorry, but we've encountered an unexpected error.\n"

@@ -500,7 +500,6 @@ class Seqs(object):
 class SeqDeduplicated(Seqs):
 
     def __init__(self, seqs, column="id", id_conv=lambda x: x):
-        self.seen = dict()
         self.id_map = list()
         if column == "desc":
             self.seqs = self._filter_desc(seqs, id_conv)
@@ -509,26 +508,28 @@ class SeqDeduplicated(Seqs):
         return
 
     def _filter_id(self, seqs, id_conv=None):
+        seen = dict()
         for record in seqs:
             checksum = record.checksum()
 
-            if checksum in self.seen:
-                new_id = self.seen[checksum]
+            if checksum in seen:
+                new_id = seen[checksum]
                 self.id_map.append((new_id, record.id, checksum, record.desc))
             else:
                 new_id = id_conv(record.id)
                 self.id_map.append((new_id, record.id, checksum, record.desc))
-                self.seen[checksum] = new_id
+                seen[checksum] = new_id
 
                 yield Seq(new_id, record.desc, record.seq)
         return
 
     def _filter_desc(self, seqs, id_conv=None):
+        seen = dict()
         for record in seqs:
             checksum = record.checksum()
 
-            if checksum in self.seen:
-                new_desc = self.seen[checksum]
+            if checksum in seen:
+                new_desc = seen[checksum]
                 self.id_map.append((
                     new_desc, record.desc, checksum, record.id
                 ))
@@ -537,7 +538,7 @@ class SeqDeduplicated(Seqs):
                 self.id_map.append((
                     new_desc, record.desc, checksum, record.id
                 ))
-                self.seen[checksum] = new_desc
+                seen[checksum] = new_desc
 
                 yield Seq(record.id, record.desc, record.seq)
         return
@@ -563,16 +564,28 @@ class SeqReId(Seqs):
         return
 
     def _filter_id(self, seqs, id_conv=None):
+        seen = dict()
         for record in seqs:
-            new_id = id_conv(record.id)
+            if record.id in seen:
+                new_id = self.seen[record.id]
+            else:
+                new_id = id_conv(record.id)
+                seen[record.id] = new_id
+
             self.id_map.append((new_id, record.id, record.desc))
 
             yield Seq(new_id, record.desc, record.seq)
         return
 
     def _filter_desc(self, seqs, id_conv=None):
+        seen = dict()
         for record in seqs:
-            new_desc = id_conv(record.desc)
+            if record.desc in seen:
+                new_desc = seen[record.desc]
+            else:
+                new_desc = id_conv(record.desc)
+                seen[record.desc] = new_desc
+
             self.id_map.append((new_desc, record.desc, record.id))
 
             yield Seq(record.id, new_desc, record.seq)

@@ -4,6 +4,8 @@ import argparse
 import csv
 from os.path import splitext
 
+from gffpal.gff import GFFRecord
+
 from seqrenamer.seq import Seqs
 from seqrenamer.id_generator import IdConverter
 from seqrenamer.exceptions import InvalidArgumentError
@@ -305,7 +307,7 @@ def encode_seqs(
 
         chunk.append(str(seq))
 
-        if i % 10000:
+        if i % 10000 == 0:
             outfile.write(''.join(chunk))
             chunk = []
             seqs.flush_ids(mapfile)
@@ -348,10 +350,125 @@ def encode_xsv(
     for i, row in enumerate(iterator, 1):
         xsv_writer.writerow(row)
 
-        if i % 10000:
+        if i % 10000 == 0:
             xsv_reader.flush_ids(mapfile)
 
     xsv_reader.flush_ids(mapfile)
+    return
+
+
+def replace_gff_seqid(record, seen, ids, id_conv):
+    old_seqid = record.seqid
+
+    if old_seqid in seen:
+        new_seqid = seen[old_seqid]
+    else:
+        new_seqid = id_conv(old_seqid)
+        seen[old_seqid] = new_seqid
+        ids.append((new_seqid, old_seqid))
+
+    record.seqid = new_seqid
+    return record
+
+
+def replace_gff_name(record, seen, ids, id_conv):
+    old_name = record.attributes.name
+
+    if old_name is None:
+        return record
+
+    if old_name in seen:
+        new_name = seen[old_name]
+    else:
+        new_name = id_conv(old_name)
+        seen[old_name] = new_name
+        ids.append((new_name, old_name))
+
+    record.attributes.name = new_name
+    return record
+
+
+def replace_gff_id(record, seen, ids, id_conv):
+    old_id = record.attributes.id
+    old_parents = record.attributes.parent
+
+    if old_id is not None:
+        if old_id in seen:
+            new_id = seen[old_id]
+        else:
+            new_id = id_conv(old_id)
+            seen[old_id] = new_id
+            ids.append((new_id, old_id))
+
+        record.attributes.id = new_id
+
+    new_parents = []
+    for old_parent in old_parents:
+        if old_parent in seen:
+            new_parent = seen[old_parent]
+            new_parents.append(new_parent)
+        else:
+            new_parent = id_conv(new_parent)
+            seen[old_parent] = new_parent
+            new_parents.append(new_parent)
+            ids.append((new_parent, old_parent))
+
+    record.attributes.parent = new_parents
+    return record
+
+
+def encode_gff(
+    infiles,
+    outfile,
+    mapfile,
+    column,
+    id_conv,
+):
+    inhandles = join_files(infiles, header=False)
+    seen = dict()
+
+    if column == "id":
+        trans_function = replace_gff_id
+    elif column == "name":
+        trans_function = replace_gff_name
+    elif column == "seqid":
+        trans_function = replace_gff_seqid
+    else:
+        raise ValueError("This shouldn't ever happen")
+
+    id_chunk = list()
+    record_chunk = list()
+
+    for i, line in enumerate(inhandles):
+        if line.startswith("#"):
+            record_chunk.append(line.strip())
+            continue
+
+        old_record = GFFRecord.parse(line)
+        new_record = trans_function(
+            old_record,
+            seen,
+            id_chunk,
+            lambda x: next(id_conv),
+        )
+        record_chunk.append(str(new_record))
+
+        if i % 10000 == 0:
+            if len(record_chunk) > 0:
+                outfile.write("\n".join(record_chunk))
+                outfile.write("\n")
+                record_chunk = list()
+
+            if len(id_chunk) > 0:
+                mapfile.write("".join(f"{n}\t{o}\n" for n, o in id_chunk))
+                id_chunk = list()
+
+    if len(record_chunk) > 0:
+        outfile.write("\n".join(record_chunk))
+        outfile.write("\n")
+
+    if len(id_chunk) > 0:
+        mapfile.write("".join(f"{n}\t{o}\n" for n, o in id_chunk))
     return
 
 
@@ -382,6 +499,14 @@ def encode(args):
             args.comment,
             args.header,
             ',' if format == "csv" else '\t',
+            id_conv,
+        )
+    elif format == "gff3":
+        encode_gff(
+            args.infiles,
+            args.outfile,
+            args.map,
+            column,
             id_conv,
         )
     else:

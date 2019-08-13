@@ -3,12 +3,14 @@ import argparse
 
 import csv
 
+from gffpal.gff import GFFRecord
+
 from seqrenamer.exceptions import MapFileParseError
 from seqrenamer.exceptions import MapFileKeyError
 from seqrenamer.exceptions import XsvColumnNumberError
 from seqrenamer.seq import Seq, Seqs
 from seqrenamer.xsv import Xsv
-from seqrenamer.scripts.encode import check_format, check_column
+from seqrenamer.scripts.encode import check_format, check_column, join_files
 from seqrenamer.scripts.encode import FORMATS
 
 
@@ -108,6 +110,16 @@ def get_from_map(map, key):
         )
 
 
+def get_from_map_single(map, key):
+    try:
+        return get_from_map(map, key)[0]
+    except IndexError:
+        raise MapFileKeyError(
+            f"Key {key} is has multiple substitution candidates. "
+            "For this format we expect only one-to-one mapping."
+        )
+
+
 def decode_seqs(infiles, outfile, map_, column):
     seqs = Seqs.parse_many(infiles)
 
@@ -122,25 +134,11 @@ def decode_seqs(infiles, outfile, map_, column):
             for old_id in old_ids:
                 chunk.append(str(Seq(old_id, seq.desc, seq.seq)))
 
-        if i % 10000:
+        if i % 10000 == 0:
             outfile.write(''.join(chunk))
             chunk = []
 
     outfile.write(''.join(chunk))
-    return
-
-
-def join_files(infiles, header=False):
-    first = True
-
-    for f in infiles:
-        if header and not first:
-            # Drop the first line
-            _ = next(f)
-
-        first = False
-        for line in f:
-            yield line.rstrip("\r\n")
     return
 
 
@@ -166,7 +164,7 @@ def decode_xsv(
             continue
 
         try:
-            old_val = get_from_map(map_, row[column])
+            old_val = get_from_map_single(map_, row[column])
             row[column] = old_val
         except IndexError:
             joined_line = sep.join(map(str, row))
@@ -179,6 +177,72 @@ def decode_xsv(
     return
 
 
+def replace_gff_id(record, map_):
+    old_id = record.attributes.id
+    old_parents = record.attributes.parent
+
+    if old_id is not None:
+        new_id = get_from_map_single(map_, old_id)
+        record.attributes.id = new_id
+
+    new_parents = []
+    for old_parent in old_parents:
+        new_parent = get_from_map_single(map_, old_parent)
+        new_parents.append(new_parent)
+
+    record.attributes.parent = new_parents
+    return record
+
+
+def replace_gff_name(record, map_):
+    old_name = record.attributes.name
+
+    if old_name is not None:
+        new_name = get_from_map_single(map_, old_name)
+        record.attributes.name = new_name
+
+    return record
+
+
+def replace_gff_seqid(record, map_):
+    old_seqid = record.seqid
+    new_seqid = get_from_map_single(map_, old_seqid)
+    record.seqid = new_seqid
+    return record
+
+
+def decode_gff(infiles, outfile, map_, column):
+    inhandles = join_files(infiles, header=False)
+
+    if column == "id":
+        trans_function = replace_gff_id
+    elif column == "name":
+        trans_function = replace_gff_name
+    elif column == "seqid":
+        trans_function = replace_gff_seqid
+    else:
+        raise ValueError("This shouldn't ever happen")
+
+    record_chunk = list()
+    for i, line in enumerate(inhandles):
+        if line.startswith("#"):
+            record_chunk.append(line.strip())
+            continue
+
+        old_record = GFFRecord.parse(line)
+        new_record = trans_function(old_record, map_)
+        record_chunk.append(str(new_record))
+
+        if i % 10000 == 0:
+            outfile.write("\n".join(record_chunk))
+            record_chunk = list()
+
+    if len(record_chunk) > 0:
+        outfile.write("\n".join(record_chunk))
+
+    return
+
+
 def decode(args):
     format = check_format(args.format, args.infiles)
     column = check_column(args.column, format)
@@ -187,7 +251,7 @@ def decode(args):
 
     if format == "fasta":
         decode_seqs(args.infiles, args.outfile, map_, column)
-    if format in ("csv", "tsv"):
+    elif format in ("csv", "tsv"):
         decode_xsv(
             args.infiles,
             args.outfile,
@@ -196,6 +260,13 @@ def decode(args):
             args.comment,
             args.header,
             ',' if format == "csv" else '\t',
+        )
+    elif format == "gff3":
+        decode_gff(
+            args.infiles,
+            args.outfile,
+            map_,
+            column,
         )
     else:
         raise ValueError("This shouldn't ever happen")

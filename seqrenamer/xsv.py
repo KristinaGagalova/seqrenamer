@@ -25,6 +25,7 @@ class Xsv(object):
 
     def replace_ids(self, id_conv, column, header):
         csv_reader = iter(self)
+        seen = dict()
 
         for row in csv_reader:
             if header:
@@ -34,8 +35,15 @@ class Xsv(object):
 
             try:
                 old_id = row[column]
-                new_id = id_conv(old_id)
+
+                if old_id in seen:
+                    new_id = seen[old_id]
+                else:
+                    new_id = id_conv(old_id)
+                    seen[old_id] = new_id
+
                 row[column] = new_id
+
             except IndexError:
                 joined_line = self.sep.join(map(str, row))
                 raise XsvColumnNumberError(
