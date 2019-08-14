@@ -1,6 +1,7 @@
 import sys
 import argparse
 
+from copy import copy
 import csv
 
 from gffpal.gff import GFFRecord
@@ -116,7 +117,7 @@ def get_from_map_single(map, key):
     except IndexError:
         raise MapFileKeyError(
             f"Key {key} is has multiple substitution candidates. "
-            "For this format we expect only one-to-one mapping."
+            "For this format and column we expect only one-to-one mapping."
         )
 
 
@@ -164,16 +165,20 @@ def decode_xsv(
             continue
 
         try:
-            old_val = get_from_map_single(map_, row[column])
-            row[column] = old_val
+            old_vals = get_from_map(map_, row[column])
+
+            # Reduplicate results
+            for old_val in old_vals:
+                new_row = copy(row)
+                new_row[column] = old_val
+                xsv_writer.writerow(new_row)
+
         except IndexError:
             joined_line = sep.join(map(str, row))
             raise XsvColumnNumberError(
                 f"Could not access column '{column}' in a line. "
                 f"The offending line was: {joined_line}."
             )
-
-        xsv_writer.writerow(row)
     return
 
 
@@ -197,18 +202,30 @@ def replace_gff_id(record, map_):
 def replace_gff_name(record, map_):
     old_name = record.attributes.name
 
+    out_records = list()
     if old_name is not None:
-        new_name = get_from_map_single(map_, old_name)
-        record.attributes.name = new_name
+        new_names = get_from_map(map_, old_name)
+        for new_name in new_names:
+            new_record = copy(record)
+            new_attributes = copy(record.attributes)
+            new_attributes.name = new_name
+            new_record.attributes = new_attributes
+            out_records.append(new_record)
 
-    return record
+    return out_records
 
 
 def replace_gff_seqid(record, map_):
     old_seqid = record.seqid
-    new_seqid = get_from_map_single(map_, old_seqid)
-    record.seqid = new_seqid
-    return record
+    new_seqids = get_from_map(map_, old_seqid)
+
+    out_records = list()
+    for new_seqid in new_seqids:
+        new_record = copy(record)
+        new_record.seqid = new_seqid
+        out_records.append(new_record)
+
+    return out_records
 
 
 def decode_gff(infiles, outfile, map_, column):
@@ -230,8 +247,8 @@ def decode_gff(infiles, outfile, map_, column):
             continue
 
         old_record = GFFRecord.parse(line)
-        new_record = trans_function(old_record, map_)
-        record_chunk.append(str(new_record))
+        new_records = trans_function(old_record, map_)
+        record_chunk.append(str(new_records))
 
         if i % 10000 == 0:
             outfile.write("\n".join(record_chunk))

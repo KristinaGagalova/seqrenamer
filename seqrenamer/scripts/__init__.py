@@ -31,6 +31,10 @@ def cli(prog, args):
 
     parsed = parser.parse_args(args)
 
+    if parsed.subparser_name is None:
+        parser.print_help()
+        sys.exit(0)
+
     return parsed
 
 
