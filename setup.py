@@ -71,12 +71,12 @@ setup(
 
     install_requires=[
         "python-baseconv",
-        "gffpal @ git+https://git@github.com/darcyabjones/gffpal.git@454424857b7cc914d116c708ab73da095fa07fb2"
+        "gffpal=v0.0.1"
     ],
 
     dependency_links=[
         # Link to your GitHub repository
-        'https://git@github.com/darcyabjones/gffpal.git#egg=454424857b7cc914d116c708ab73da095fa07fb2'
+        'https://github.com/KristinaGagalova/gffpal/archive/refs/tags/v0.0.1'
     ]
 
     # List additional groups of dependencies here (e.g. development
