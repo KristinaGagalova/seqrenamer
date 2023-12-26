@@ -73,7 +73,11 @@ setup(
         "python-baseconv",
         "gffpal @ git+https://git@github.com/darcyabjones/gffpal.git@454424857b7cc914d116c708ab73da095fa07fb2"
     ],
-    
+
+    dependency_links=[
+        # Link to your GitHub repository
+        'https://git@github.com/darcyabjones/gffpal.git#egg=454424857b7cc914d116c708ab73da095fa07fb2'
+    ]
 
     # List additional groups of dependencies here (e.g. development
     # dependencies). You can install these using the following syntax,
