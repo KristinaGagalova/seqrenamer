@@ -73,7 +73,7 @@ setup(
         "python-baseconv"
     ],
     dependency_links=[
-        https://github.com/darcyabjones/gffpal/commits/master/#egg=454424857b7cc914d116c708ab73da095fa07fb2
+        'https://github.com/darcyabjones/gffpal/commits/master#egg=454424857b7cc914d116c708ab73da095fa07fb2'
     ]
 
     # List additional groups of dependencies here (e.g. development
