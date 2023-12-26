@@ -71,7 +71,7 @@ setup(
 
     install_requires=[
         "python-baseconv",
-        "gffpal @ git+ssh://git@github.com/darcyabjones/gffpal.git@454424857b7cc914d116c708ab73da095fa07fb2"
+        "gffpal @ git+https://git@github.com/darcyabjones/gffpal.git@454424857b7cc914d116c708ab73da095fa07fb2"
     ],
     
 
