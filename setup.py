@@ -70,9 +70,11 @@ setup(
     # https://packaging.python.org/en/latest/requirements.html
 
     install_requires=[
-        "python-baseconv",
-        "gffpal @ https://github.com/darcyabjones/gffpal/archive/master.zip#egg=gffpal=0.0.0"
+        "python-baseconv"
     ],
+    dependency_links=[
+        https://github.com/darcyabjones/gffpal/commits/master/#egg=454424857b7cc914d116c708ab73da095fa07fb2
+    ]
 
     # List additional groups of dependencies here (e.g. development
     # dependencies). You can install these using the following syntax,
